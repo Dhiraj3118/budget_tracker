@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      :root {
+        --primary-color: #1a73e8;
+        --bg-color: #f8f9fa;
+        --border-color: #dadce0;
+      }
+
+      body { 
+        font-family: 'Google Sans', Roboto, Arial, sans-serif; 
+        padding: 0; margin: 0;
+        background-color: var(--bg-color);
+        display: flex; flex-direction: column; align-items: center;
+        color: #3c4043;
+      }
+      
+      /* --- HEADER --- */
+      .header {
+        text-align: center;
+        background-color: white; width: 100%; padding: 15px 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        position: sticky; top: 0; z-index: 100;
+      }
+
+      .header-form{
+        display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; align-items: center;
+      }
+
+      select {
+        padding: 10px; font-size: 16px; border-radius: 4px;
+        border: 1px solid var(--border-color);
+        background-color: #fff; min-width: 200px;
+      }
+
+      /* Button Style */
+      .btn-open {
+        background-color: var(--primary-color); color: white;
+        padding: 10px 20px; border-radius: 4px; text-decoration: none;
+        font-weight: 500; font-size: 14px; border: none; cursor: pointer;
+        display: none; /* Hidden until data loads */
+        align-items: center; gap: 5px;
+      }
+      .btn-open:hover { background-color: #1557b0; }
+
+      /* --- CONTENT LAYOUT --- */
+      .container {
+        width: 95%; max-width: 1000px; margin-top: 20px; padding-bottom: 40px;
+      }
+
+      /* Charts Section */
+      .section-title { font-size: 18px; margin: 30px 0 15px; border-bottom: 2px solid #eee; padding-bottom: 5px;}
+      
+      .chart-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;
+      }
+      
+      .chart-card {
+        background: white; padding: 15px; border-radius: 8px;
+        box-shadow: 0 1px 2px rgba(60,64,67,0.3); text-align: center;
+      }
+      .chart-card img { max-width: 100%; height: auto; border: 1px solid #f1f3f4; }
+      .chart-card h3 { margin: 0 0 10px; font-size: 16px; color: #5f6368; }
+
+      /* Table Section */
+      .table-wrapper {
+        overflow-x: auto; background: white; border-radius: 8px;
+        box-shadow: 0 1px 2px rgba(60,64,67,0.3);
+      }
+      
+      table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border-color); }
+      th { background-color: #f1f3f4; font-weight: 600; color: #202124; position: sticky; top: 0;}
+      tr:last-child td { border-bottom: none; }
+      tr:hover { background-color: #f8f9fa; }
+
+      /* Utility */
+      .message { text-align: center; margin-top: 50px; color: #5f6368; font-style: italic;}
+      .error { color: #d93025; background: #fce8e6; padding: 15px; border-radius: 8px; }
+    </style>
+  </head>
+  <body>
+
+    <div class="header">
+      <h2>📊 Analyse Your Bugdets 💸</h2>
+      <div class="header-form">
+        <select id="sheetSelector" onchange="loadDashboard()">
+          <option value="" disabled selected>Loading sheets...</option>
+        </select>
+        <a id="sheetLink" class="btn-open" href="#" target="_blank">Open in Sheets &#8599;</a>
+      </div>
+    </div>
+
+    <div class="container" id="mainContent">
+    </div>
+
+    <script>
+      // 1. Initialize
+      window.onload = function() {
+        google.script.run
+          .withSuccessHandler(populateDropdown)
+          .withFailureHandler(showError)
+          .getSheetNames();
+      };
+
+      function populateDropdown(sheetNames) {
+        const selector = document.getElementById('sheetSelector');
+        selector.innerHTML = ''; 
+
+        if (sheetNames.length === 0) {
+          selector.innerHTML = '<option>No sheets found</option>';
+          return;
+        }
+
+        sheetNames.forEach(name => {
+          const option = document.createElement('option');
+          option.value = name;
+          option.text = name;
+          selector.add(option);
+        });
+
+        // Load first sheet automatically
+        loadDashboard();
+      }
+
+      // 2. Fetch Data
+      function loadDashboard() {
+        const sheetName = document.getElementById('sheetSelector').value;
+        const container = document.getElementById('mainContent');
+        const btn = document.getElementById('sheetLink');
+        
+        // UI Reset
+        container.innerHTML = '<div class="message">Fetching charts and data...</div>';
+        btn.style.display = 'none'; // Hide button while loading
+
+        google.script.run
+          .withSuccessHandler(renderDashboard)
+          .withFailureHandler(showError)
+          .getSheetData(sheetName);
+      }
+
+      // 3. Render Everything
+      function renderDashboard(data) {
+        const container = document.getElementById('mainContent');
+        container.innerHTML = ''; // Clear loading message
+
+        // A. Setup "Open Sheet" Button
+        const btn = document.getElementById('sheetLink');
+        btn.href = data.sheetUrl;
+        btn.style.display = 'flex';
+
+        // B. Render Charts
+        if (data.charts.length > 0) {
+          const chartTitle = document.createElement('div');
+          chartTitle.className = 'section-title';
+          chartTitle.textContent = 'Visualization';
+          container.appendChild(chartTitle);
+
+          const grid = document.createElement('div');
+          grid.className = 'chart-grid';
+          
+          data.charts.forEach(chart => {
+            const card = document.createElement('div');
+            card.className = 'chart-card';
+            card.innerHTML = `<img src="${chart.imgSrc}">`;
+            grid.appendChild(card);
+          });
+          container.appendChild(grid);
+        } else {
+          container.innerHTML += '<div class="message">No charts found.</div>';
+        }
+
+        // C. Render Table (Columns D-G)
+        if (data.tableData.length > 0) {
+          const tableTitle = document.createElement('div');
+          tableTitle.className = 'section-title';
+          tableTitle.textContent = 'Budget Utilisation';
+          container.appendChild(tableTitle);
+
+          const tableWrapper = document.createElement('div');
+          tableWrapper.className = 'table-wrapper';
+          
+          let tableHtml = '<table>';
+          
+          // Header (First row of data)
+          tableHtml += '<thead><tr>';
+          data.tableData[0].forEach(cell => {
+             tableHtml += `<th>${cell}</th>`;
+          });
+          tableHtml += '</tr></thead>';
+
+          // Body (Rest of rows)
+          tableHtml += '<tbody>';
+          for (let i = 1; i < data.tableData.length; i++) {
+            const lastRow = i === data.tableData.length - 1
+            tableHtml += '<tr>';
+            data.tableData[i].forEach((cell) => {
+              tableHtml += `<td>${cell}</td>`;
+            });
+            tableHtml += '</tr>';
+          }
+          tableHtml += '</tbody></table>';
+
+          tableWrapper.innerHTML = tableHtml;
+          container.appendChild(tableWrapper);
+        } else {
+          container.innerHTML += '<div class="message">No data found</div>';
+        }
+      }
+
+      function showError(error) {
+        const container = document.getElementById('mainContent');
+        container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+      }
+    </script>
+  </body>
+</html>
